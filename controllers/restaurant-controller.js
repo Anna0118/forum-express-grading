@@ -1,4 +1,4 @@
-const { Restaurant, Category, Comment, User } = require('../models')
+const { Restaurant, Category, Comment, User, Favorite } = require('../models')
 const { getOffset, getPagination } = require('../helpers/pagination-helper')
 const restaurantController = {
   getRestaurants: (req, res, next) => {
@@ -70,7 +70,10 @@ const restaurantController = {
   },
   getDashboard: (req, res, next) => {
     return Restaurant.findByPk(req.params.id, {
-      include: Category,
+      // include: Category,
+      include: [Category,
+        Comment,
+        { model: User, as: 'FavoritedUsers' }],
       nest: true,
       raw: true
     })
@@ -95,12 +98,18 @@ const restaurantController = {
         include: [User, Restaurant],
         raw: true,
         nest: true
-      })
+      }),
+      // Favorite.findAll({
+      //   where: {
+      //     restaurantId: req.params.id
+      //   }
+      // })
     ])
-      .then(([restaurants, comments]) => {
+      .then(([restaurants, comments, favorites]) => {
         res.render('feeds', {
           restaurants,
-          comments
+          comments,
+          favorites
         })
       })
       .catch(err => next(err))
@@ -111,16 +120,16 @@ const restaurantController = {
     })
       .then(restaurants => {
         const result = restaurants
-          .map(r => ({
+          .map((r) => ({
             ...r.toJSON(),
             description: r.description.substring(0, 50),
             favoritedCount: r.FavoritedUsers.length,
             isfavorited:
               req.user &&
-              req.user.FavoritedRestaurants.some(f => f.id === r.id)
+              req.user.FavoritedRestaurants.some((f) => f.id === r.id),
           }))
           .sort((a, b) => b.favoritedCount - a.favoritedCount)
-          .slice(0, 10)
+          .slice(0, 10);
         res.render('top-restaurants', { restaurants: result })
       })
       .catch(err => next(err))
